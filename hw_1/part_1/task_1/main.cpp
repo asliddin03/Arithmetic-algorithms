@@ -1,14 +1,16 @@
 #include <iostream>
+#include <iomanip>
 #include <vector>
 
 using std::cin;
+using std::cout;
 using std::vector;
 using std::pair;
 
 const long double EPS = 1e-12L;
 
-bool isZero(long double x) {
-    return fabsl(x) < EPS;
+bool isZero(long double val) {
+    return fabsl(val) < EPS;
 }
 
 pair<bool, vector<long double> > gaussSolve(vector<vector<long double> > &G, vector<long double> &f) {
@@ -22,7 +24,7 @@ pair<bool, vector<long double> > gaussSolve(vector<vector<long double> > &G, vec
         }
         G_f[i][n] = f[i];
     }
-    vector<long double> where(n, -1);
+    vector<int> where(n, -1);
     int row = 0;
     for (int col = 0; col < n && row < m; ++col) {
         int ind = -1;
@@ -57,7 +59,6 @@ pair<bool, vector<long double> > gaussSolve(vector<vector<long double> > &G, vec
         row++;
     }
 
-    vector<long double> ans(n, 0);
     for (int i = 0; i < m; ++i) {
         bool all_zero = true;
         for (int j = 0; j < n; ++j) {
@@ -67,9 +68,20 @@ pair<bool, vector<long double> > gaussSolve(vector<vector<long double> > &G, vec
             }
         }
         if (all_zero && !isZero(G_f[i][n])) {
-            return {false, ans};
+            return {false, {}};
         }
     }
+
+    vector<long double> ans(n, 0);
+    for (int col = 0; col < n; ++col) {
+        if (where[col] != -1) {
+            ans[col] = G_f[where[col]][n];
+        } else {
+            ans[col] = 0;
+        }
+    }
+
+    return {true, ans};
 
 }
 
@@ -106,4 +118,14 @@ int main() {
     }
 
     auto[ok, A] = gaussSolve(G, func_f);
+
+    if (!ok) {
+        std::cout << "No solution" << std::endl;
+    }
+
+    cout.setf(std::ios::fixed);
+    cout << std::setprecision(12);
+    for (int i = 0; i < k; i++) {
+        cout << A[i] << (i + 1 == k ? '\n' : ' ');
+    }
 }
