@@ -7,3 +7,4 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(task_1 task_1/main.cpp)
 add_executable(task_2 task_2/main.cpp)
+add_executable(task_3 task_3/main.cpp)

@@ -122,8 +122,7 @@ int main() {
     if (!ok) {
         std::cout << "No solution" << std::endl;
     }
-
-    cout.setf(std::ios::fixed);
+    
     cout << std::setprecision(12);
     for (int i = 0; i < k; i++) {
         cout << A[i] << (i + 1 == k ? '\n' : ' ');

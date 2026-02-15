@@ -60,7 +60,7 @@ int main() {
     cin >> n;
 
     vector<long double> coef_f(n + 1);
-    cout << "Введите коэффициенты для f(x)\n";
+    cout << "Введите коэффициенты для f(x):\n";
     for (int i = 0; i <= n; i++) {
         cin >> coef_f[i];
     }
