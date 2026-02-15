@@ -1,0 +1,24 @@
+# ninja log v6
+10	621	1771113696392926962	CMakeFiles/task_2.dir/task_2/main.cpp.o	a17e5796c893c363
+621	685	1771113697004144337	task_2	6587bd757324b923
+8	622	1771160059909583709	CMakeFiles/task_3.dir/task_3/main.cpp.o	c3f0628792927bc3
+622	687	1771160060522966690	task_3	f21e7bfe80f746d9
+1	440	1771176471151148306	CMakeFiles/task_4.dir/task_4/main.cpp.o	68a182d1fc97d421
+4	630	1771178457040542864	CMakeFiles/task_4.dir/task_4/polynomial_utils.cpp.o	b044ee6b85560b5c
+4	746	1771178457040837032	CMakeFiles/task_4.dir/task_4/limitInf.cpp.o	b0d7c6b68cdd1eaf
+4	754	1771178457040691573	CMakeFiles/task_4.dir/task_4/limitAtA.cpp.o	e895bc3dc943df0d
+3	799	1771178457040221404	CMakeFiles/task_4.dir/task_4/main.cpp.o	d1ed1ae60ccbd56f
+799	861	1771178457835693919	task_4	78716daed6e77694
+4	631	1771178824384192295	CMakeFiles/task_4.dir/task_4/main.cpp.o	d1ed1ae60ccbd56f
+631	692	1771178825010526133	task_4	78716daed6e77694
+4	526	1771178962260489790	CMakeFiles/task_4.dir/task_4/limitInf.cpp.o	b0d7c6b68cdd1eaf
+4	537	1771178962260310955	CMakeFiles/task_4.dir/task_4/limitAtA.cpp.o	e895bc3dc943df0d
+3	538	1771178962259875994	CMakeFiles/task_4.dir/task_4/main.cpp.o	d1ed1ae60ccbd56f
+538	605	1771178962794557439	task_4	78716daed6e77694
+5	499	1771179324074580651	CMakeFiles/task_4.dir/task_4/polynomial_utils.cpp.o	b044ee6b85560b5c
+5	577	1771179324074952112	CMakeFiles/task_4.dir/task_4/limitInf.cpp.o	b0d7c6b68cdd1eaf
+5	591	1771179324074777027	CMakeFiles/task_4.dir/task_4/limitAtA.cpp.o	e895bc3dc943df0d
+4	603	1771179324074151732	CMakeFiles/task_4.dir/task_4/main.cpp.o	d1ed1ae60ccbd56f
+603	666	1771179324672303840	task_4	78716daed6e77694
+5	551	1771179394894040729	CMakeFiles/task_4.dir/task_4/limitAtA.cpp.o	e895bc3dc943df0d
+551	608	1771179395439987739	task_4	78716daed6e77694
