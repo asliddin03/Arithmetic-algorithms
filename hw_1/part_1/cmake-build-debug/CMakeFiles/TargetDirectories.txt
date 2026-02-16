@@ -1,6 +1,0 @@
-/Users/sarvar/c++/Arithmetic algorithms/hw_1/part_1/cmake-build-debug/CMakeFiles/task_1.dir
-/Users/sarvar/c++/Arithmetic algorithms/hw_1/part_1/cmake-build-debug/CMakeFiles/task_2.dir
-/Users/sarvar/c++/Arithmetic algorithms/hw_1/part_1/cmake-build-debug/CMakeFiles/task_3.dir
-/Users/sarvar/c++/Arithmetic algorithms/hw_1/part_1/cmake-build-debug/CMakeFiles/task_4.dir
-/Users/sarvar/c++/Arithmetic algorithms/hw_1/part_1/cmake-build-debug/CMakeFiles/edit_cache.dir
-/Users/sarvar/c++/Arithmetic algorithms/hw_1/part_1/cmake-build-debug/CMakeFiles/rebuild_cache.dir
