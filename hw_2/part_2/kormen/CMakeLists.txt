@@ -6,3 +6,4 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(task_30_1_7 task_30_1_7/main.cpp)
+add_executable(task_30_3 task_30_3/main.cpp)
