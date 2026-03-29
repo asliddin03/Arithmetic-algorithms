@@ -1,39 +1,50 @@
 #pragma once
-#include <vector>
-#include <map>
-#include <string>
 
-using std::map;
-using std::vector;
-using std::string;
-using std::unique_ptr;
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 struct Term {
     int coef = 0;
-    vector<int> exponents;
+    std::vector<int> exponents;
 };
 
 class PolynomialTrie {
 private:
     struct Node {
-        map<int, unique_ptr<Node>> children;
+        std::map<int, std::unique_ptr<Node>> children;
         int coef = 0;
         bool hasCoef = false;
     };
 
-    unique_ptr<Node> root;
-    vector<string> vars;
+    std::unique_ptr<Node> root;
+    std::vector<std::string> vars;
     int modulus = 2;
 
-    void collectTermsDFS(const Node* node, int level, vector<int>& path,
-        vector<Term>& result) const;
-
-    void checkCompatible(const PolynomialTrie& other) const;
     std::unique_ptr<Node> cloneNode(const Node* node) const;
 
-    public:
+    void checkModulus(int mod) const;
+    void checkExponents(const std::vector<int>& exponents) const;
+    void checkCompatible(const PolynomialTrie& other) const;
+
+    void collectTermsDFS(
+        const Node* node,
+        int level,
+        std::vector<int>& path,
+        std::vector<Term>& result
+    ) const;
+
+    int evaluateHornerRecursive(
+        const std::vector<Term>& termsList,
+        const std::vector<int>& point,
+        int variableIndex
+    ) const;
+
+public:
     PolynomialTrie();
-    PolynomialTrie(const vector<string>& varNames, int mod);
+    PolynomialTrie(const std::vector<std::string>& varNames, int mod);
 
     PolynomialTrie(const PolynomialTrie& other);
     PolynomialTrie& operator=(const PolynomialTrie& other);
@@ -42,19 +53,19 @@ private:
     PolynomialTrie& operator=(PolynomialTrie&& other) noexcept = default;
 
     int varCount() const;
-    const vector<string>& variableNames() const;
+    const std::vector<std::string>& variableNames() const;
     int getModulus() const;
 
-    void setVariableNames(const vector<string>& varNames);
+    void setVariableNames(const std::vector<std::string>& varNames);
     void setModulus(int mod);
     void clear();
 
     int normalizeCoef(int value) const;
 
-    void addMonomial(int coef, const vector<int>& exponents);
-    void setMonomial(int coef, const vector<int>& exponents);
+    void addMonomial(int coef, const std::vector<int>& exponents);
+    void setMonomial(int coef, const std::vector<int>& exponents);
 
-    vector<Term> terms() const;
+    std::vector<Term> terms() const;
     void normalize();
     bool isZero() const;
 
@@ -66,11 +77,11 @@ private:
     PolynomialTrie operator-(const PolynomialTrie& other) const;
     PolynomialTrie operator*(const PolynomialTrie& other) const;
 
-    bool operator==(const PolynomialTrie &other) const;
-    bool operator!=(const PolynomialTrie &other) const;
+    bool operator==(const PolynomialTrie& other) const;
+    bool operator!=(const PolynomialTrie& other) const;
 
-    vector<vector<int>> support() const;
-    int evaluateAt(const vector<int>& point) const;
+    std::vector<std::vector<int>> support() const;
+    int evaluateAt(const std::vector<int>& point) const;
     int homeDegree() const;
     std::pair<PolynomialTrie, PolynomialTrie> splitByDegree(int degree) const;
 

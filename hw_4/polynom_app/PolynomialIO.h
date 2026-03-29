@@ -2,12 +2,24 @@
 
 #include "Polynomial.h"
 
+#include <ostream>
 #include <string>
 #include <vector>
 
-int readModulus();
-std::vector<std::string> readVariableNames();
-PolynomialTrie readPolynomial(const std::vector<std::string>& vars, int mod, const std::string& polyName);
+struct JsonCommand {
+    std::string op;
+    std::vector<int> point;
+    int degree = 0;
+};
 
-void printMenu();
-void printSupport(const PolynomialTrie& f);
+struct JsonInputData {
+    int modulus = 0;
+    std::vector<std::string> variables;
+    PolynomialTrie f;
+    PolynomialTrie g;
+    std::vector<JsonCommand> commands;
+};
+
+JsonInputData readJsonInput(const std::string& filename);
+void executeCommands(const JsonInputData& data, std::ostream& out);
+void printSupport(const PolynomialTrie& f, std::ostream& out);

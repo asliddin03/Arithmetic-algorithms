@@ -1,108 +1,164 @@
 #include "PolynomialIO.h"
 
-#include <iostream>
+#include <fstream>
 #include <stdexcept>
 
-using namespace std;
+#include <nlohmann/json.hpp>
 
-int readModulus() {
-    int k;
-    cout << "Введите модуль k для Z_k: ";
-    cin >> k;
+using json = nlohmann::json;
 
-    if (k <= 0) {
-        throw runtime_error("Модуль k должен быть положительным.");
+namespace {
+
+PolynomialTrie buildPolynomial(
+    const std::vector<std::string>& variables,
+    int modulus,
+    const json& polyJson
+) {
+    if (!polyJson.is_array()) {
+        throw std::runtime_error("Polynomial must be a JSON array.");
     }
 
-    return k;
-}
+    PolynomialTrie poly(variables, modulus);
 
-vector<string> readVariableNames() {
-    int n;
-    cout << "Введите число переменных n: ";
-    cin >> n;
-
-    if (n <= 0) {
-        throw runtime_error("Число переменных должно быть положительным.");
-    }
-
-    vector<string> vars(n);
-    cout << "Введите имена переменных:\n";
-
-    for (int i = 0; i < n; ++i) {
-        cout << "name[" << i << "] = ";
-        cin >> vars[i];
-    }
-
-    return vars;
-}
-
-PolynomialTrie readPolynomial(const vector<string>& vars, int mod, const string& polyName) {
-    PolynomialTrie p(vars, mod);
-
-    int m;
-    cout << "Введите число мономов многочлена " << polyName << ": ";
-    cin >> m;
-
-    if (m < 0) {
-        throw runtime_error("Число мономов не может быть отрицательным.");
-    }
-
-    for (int i = 0; i < m; ++i) {
-        int coef;
-        vector<int> exponents(vars.size());
-
-        cout << "\nМоном #" << (i + 1) << "\n";
-        cout << "Коэффициент: ";
-        cin >> coef;
-
-        for (size_t j = 0; j < vars.size(); ++j) {
-            cout << "Степень переменной " << vars[j] << ": ";
-            cin >> exponents[j];
+    for (const auto& monomial : polyJson) {
+        if (!monomial.is_object()) {
+            throw std::runtime_error("Each monomial must be a JSON object.");
         }
 
-        p.addMonomial(coef, exponents);
+        if (!monomial.contains("coef") || !monomial.contains("exponents")) {
+            throw std::runtime_error("Monomial must contain coef and exponents.");
+        }
+
+        const int coef = monomial.at("coef").get<int>();
+        const std::vector<int> exponents = monomial.at("exponents").get<std::vector<int>>();
+
+        poly.addMonomial(coef, exponents);
     }
 
-    return p;
+    return poly;
 }
 
-void printMenu() {
-    cout << "\n================= МЕНЮ =================\n";
-    cout << "1. Ввести/изменить модуль k и переменные\n";
-    cout << "2. Ввести многочлен f\n";
-    cout << "3. Ввести многочлен g\n";
-    cout << "4. Показать f и g\n";
-    cout << "5. Пункт a: f + g\n";
-    cout << "6. Пункт a: f - g\n";
-    cout << "7. Пункт a: f * g\n";
-    cout << "8. Пункт b: supp(f)\n";
-    cout << "9. Пункт c: проверить f == g\n";
-    cout << "10. Пункт d: вычислить f(A)\n";
-    cout << "11. Пункт e: проверить однородность f\n";
-    cout << "12. Пункт f: выделить однородную часть степени p\n";
-    cout << "0. Выход\n";
-    cout << "100. Показать меню снова\n";
-    cout << "========================================\n";
+JsonCommand parseCommand(const json& cmdJson) {
+    if (!cmdJson.is_object()) {
+        throw std::runtime_error("Command must be a JSON object.");
+    }
+
+    if (!cmdJson.contains("op")) {
+        throw std::runtime_error("Command must contain op.");
+    }
+
+    JsonCommand cmd;
+    cmd.op = cmdJson.at("op").get<std::string>();
+
+    if (cmdJson.contains("point")) {
+        cmd.point = cmdJson.at("point").get<std::vector<int>>();
+    }
+
+    if (cmdJson.contains("degree")) {
+        cmd.degree = cmdJson.at("degree").get<int>();
+    }
+
+    return cmd;
 }
 
-void printSupport(const PolynomialTrie& f) {
+} // namespace
+
+JsonInputData readJsonInput(const std::string& filename) {
+    std::ifstream in(filename);
+    if (!in) {
+        throw std::runtime_error("Cannot open input file: " + filename);
+    }
+
+    json j = json::parse(in);
+
+    if (!j.is_object()) {
+        throw std::runtime_error("Root JSON must be an object.");
+    }
+
+    if (!j.contains("modulus") || !j.contains("variables") ||
+        !j.contains("f") || !j.contains("g") || !j.contains("commands")) {
+        throw std::runtime_error("JSON must contain modulus, variables, f, g, commands.");
+    }
+
+    JsonInputData data;
+    data.modulus = j.at("modulus").get<int>();
+    data.variables = j.at("variables").get<std::vector<std::string>>();
+
+    data.f = buildPolynomial(data.variables, data.modulus, j.at("f"));
+    data.g = buildPolynomial(data.variables, data.modulus, j.at("g"));
+
+    const json& commandsJson = j.at("commands");
+    if (!commandsJson.is_array()) {
+        throw std::runtime_error("commands must be an array.");
+    }
+
+    for (const auto& cmdJson : commandsJson) {
+        data.commands.push_back(parseCommand(cmdJson));
+    }
+
+    return data;
+}
+
+void printSupport(const PolynomialTrie& f, std::ostream& out) {
     const auto supp = f.support();
 
+    out << "supp(f):\n";
     if (supp.empty()) {
-        cout << "supp(f) = пустое множество\n";
+        out << "empty\n";
         return;
     }
 
-    cout << "supp(f):\n";
     for (const auto& exps : supp) {
-        cout << "(";
+        out << "(";
         for (size_t i = 0; i < exps.size(); ++i) {
-            cout << exps[i];
+            out << exps[i];
             if (i + 1 != exps.size()) {
-                cout << ", ";
+                out << ", ";
             }
         }
-        cout << ")\n";
+        out << ")\n";
+    }
+}
+
+void executeCommands(const JsonInputData& data, std::ostream& out) {
+    const PolynomialTrie& f = data.f;
+    const PolynomialTrie& g = data.g;
+
+    for (const auto& cmd : data.commands) {
+        if (cmd.op == "print") {
+            out << "f = " << f.toString() << "\n";
+            out << "g = " << g.toString() << "\n";
+        } else if (cmd.op == "add") {
+            out << "f + g = " << (f + g).toString() << "\n";
+        } else if (cmd.op == "subtract") {
+            out << "f - g = " << (f - g).toString() << "\n";
+        } else if (cmd.op == "multiply") {
+            out << "f * g = " << (f * g).toString() << "\n";
+        } else if (cmd.op == "support") {
+            printSupport(f, out);
+        } else if (cmd.op == "equal") {
+            out << ((f == g) ? "f == g\n" : "f != g\n");
+        } else if (cmd.op == "eval") {
+            out << "f(A) = " << f.evaluateAt(cmd.point) << "\n";
+        } else if (cmd.op == "homogeneous_degree") {
+            if (f.isZero()) {
+                out << "homogeneous degree = 0\n";
+            } else {
+                const int d = f.homeDegree();
+                if (d == -1) {
+                    out << "not homogeneous\n";
+                } else {
+                    out << "homogeneous degree = " << d << "\n";
+                }
+            }
+        } else if (cmd.op == "split_by_degree") {
+            const auto [h, rest] = f.splitByDegree(cmd.degree);
+            out << "h = " << h.toString() << "\n";
+            out << "g = " << rest.toString() << "\n";
+        } else {
+            throw std::runtime_error("Unknown operation: " + cmd.op);
+        }
+
+        out << "\n";
     }
 }
