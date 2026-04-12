@@ -11,27 +11,26 @@ namespace {
 
 PolynomialTrie buildPolynomial(
     const std::vector<std::string>& variables,
-    int modulus,
+    CoefDomain domain,
+    Coef modulus,
     const json& polyJson
 ) {
     if (!polyJson.is_array()) {
         throw std::runtime_error("Polynomial must be a JSON array.");
     }
 
-    PolynomialTrie poly(variables, modulus);
+    PolynomialTrie poly(variables, domain, modulus);
 
     for (const auto& monomial : polyJson) {
         if (!monomial.is_object()) {
             throw std::runtime_error("Each monomial must be a JSON object.");
         }
-
         if (!monomial.contains("coef") || !monomial.contains("exponents")) {
             throw std::runtime_error("Monomial must contain coef and exponents.");
         }
 
-        const int coef = monomial.at("coef").get<int>();
+        const Coef coef = monomial.at("coef").get<Coef>();
         const std::vector<int> exponents = monomial.at("exponents").get<std::vector<int>>();
-
         poly.addMonomial(coef, exponents);
     }
 
@@ -39,29 +38,46 @@ PolynomialTrie buildPolynomial(
 }
 
 JsonCommand parseCommand(const json& cmdJson) {
-    if (!cmdJson.is_object()) {
-        throw std::runtime_error("Command must be a JSON object.");
-    }
-
-    if (!cmdJson.contains("op")) {
-        throw std::runtime_error("Command must contain op.");
+    if (!cmdJson.is_object() || !cmdJson.contains("op")) {
+        throw std::runtime_error("Command must be an object with field op.");
     }
 
     JsonCommand cmd;
     cmd.op = cmdJson.at("op").get<std::string>();
 
     if (cmdJson.contains("point")) {
-        cmd.point = cmdJson.at("point").get<std::vector<int>>();
+        cmd.point = cmdJson.at("point").get<std::vector<Coef>>();
     }
-
     if (cmdJson.contains("degree")) {
         cmd.degree = cmdJson.at("degree").get<int>();
+    }
+    if (cmdJson.contains("order")) {
+        cmd.order = cmdJson.at("order").get<std::string>();
     }
 
     return cmd;
 }
 
 } // namespace
+
+CoefDomain parseDomain(const std::string& s) {
+    if (s == "Z") {
+        return CoefDomain::Z;
+    }
+    if (s == "Zk") {
+        return CoefDomain::Zk;
+    }
+    throw std::runtime_error("Unknown coefficient domain: " + s);
+}
+
+MonomialOrder parseOrder(const std::string& s) {
+    if (s == "lex") return MonomialOrder::Lex;
+    if (s == "grlex") return MonomialOrder::GrLex;
+    if (s == "grevlex") return MonomialOrder::GrevLex;
+    if (s == "invlex") return MonomialOrder::InvLex;
+    if (s == "rvlex") return MonomialOrder::RevLex;
+    throw std::runtime_error("Unknown monomial order: " + s);
+}
 
 JsonInputData readJsonInput(const std::string& filename) {
     std::ifstream in(filename);
@@ -70,22 +86,24 @@ JsonInputData readJsonInput(const std::string& filename) {
     }
 
     json j = json::parse(in);
-
     if (!j.is_object()) {
         throw std::runtime_error("Root JSON must be an object.");
     }
 
-    if (!j.contains("modulus") || !j.contains("variables") ||
+    if (!j.contains("domain") || !j.contains("variables") ||
         !j.contains("f") || !j.contains("g") || !j.contains("commands")) {
-        throw std::runtime_error("JSON must contain modulus, variables, f, g, commands.");
+        throw std::runtime_error("JSON must contain domain, variables, f, g, commands.");
     }
 
     JsonInputData data;
-    data.modulus = j.at("modulus").get<int>();
-    data.variables = j.at("variables").get<std::vector<std::string>>();
+    data.domain = parseDomain(j.at("domain").get<std::string>());
+    data.modulus = (data.domain == CoefDomain::Zk)
+        ? j.at("modulus").get<Coef>()
+        : 2;
 
-    data.f = buildPolynomial(data.variables, data.modulus, j.at("f"));
-    data.g = buildPolynomial(data.variables, data.modulus, j.at("g"));
+    data.variables = j.at("variables").get<std::vector<std::string>>();
+    data.f = buildPolynomial(data.variables, data.domain, data.modulus, j.at("f"));
+    data.g = buildPolynomial(data.variables, data.domain, data.modulus, j.at("g"));
 
     const json& commandsJson = j.at("commands");
     if (!commandsJson.is_array()) {
@@ -120,6 +138,17 @@ void printSupport(const PolynomialTrie& f, std::ostream& out) {
     }
 }
 
+void printMultiDegree(const std::vector<int>& exponents, std::ostream& out) {
+    out << "(";
+    for (size_t i = 0; i < exponents.size(); ++i) {
+        out << exponents[i];
+        if (i + 1 != exponents.size()) {
+            out << ", ";
+        }
+    }
+    out << ")";
+}
+
 void executeCommands(const JsonInputData& data, std::ostream& out) {
     const PolynomialTrie& f = data.f;
     const PolynomialTrie& g = data.g;
@@ -145,16 +174,29 @@ void executeCommands(const JsonInputData& data, std::ostream& out) {
                 out << "homogeneous degree = 0\n";
             } else {
                 const int d = f.homeDegree();
-                if (d == -1) {
-                    out << "not homogeneous\n";
-                } else {
-                    out << "homogeneous degree = " << d << "\n";
-                }
+                out << (d == -1 ? "not homogeneous\n" : "homogeneous degree = " + std::to_string(d) + "\n");
             }
         } else if (cmd.op == "split_by_degree") {
             const auto [h, rest] = f.splitByDegree(cmd.degree);
             out << "h = " << h.toString() << "\n";
             out << "g = " << rest.toString() << "\n";
+        } else if (cmd.op == "lm") {
+            const MonomialOrder order = parseOrder(cmd.order);
+            out << "lm(f) [" << cmd.order << "] = "
+                << f.monomialOnlyToString(f.leadingMonomial(order)) << "\n";
+        } else if (cmd.op == "lt") {
+            const MonomialOrder order = parseOrder(cmd.order);
+            out << "lt(f) [" << cmd.order << "] = "
+                << f.monomialToString(f.leadingTerm(order)) << "\n";
+        } else if (cmd.op == "lc") {
+            const MonomialOrder order = parseOrder(cmd.order);
+            out << "lc(f) [" << cmd.order << "] = "
+                << f.displayCoef(f.leadingCoefficient(order)) << "\n";
+        } else if (cmd.op == "multideg") {
+            const MonomialOrder order = parseOrder(cmd.order);
+            out << "multideg(f) [" << cmd.order << "] = ";
+            printMultiDegree(f.multiDegree(order), out);
+            out << "\n";
         } else {
             throw std::runtime_error("Unknown operation: " + cmd.op);
         }

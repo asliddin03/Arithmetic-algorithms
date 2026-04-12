@@ -1,23 +1,31 @@
 #include "Polynomial.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <sstream>
 #include <stdexcept>
 
 namespace {
 
-    int mulMod(int a, int b, int mod) {
-        return static_cast<int>((static_cast<std::int64_t>(a) * b) % mod);
-    }
-
+Coef mulMod(Coef a, Coef b, Coef mod) {
+    return static_cast<Coef>((__int128)a * (__int128)b % (__int128)mod);
 }
 
-PolynomialTrie::PolynomialTrie()
-    : root(std::make_unique<Node>()), modulus(2) {}
+} // namespace
 
-PolynomialTrie::PolynomialTrie(const std::vector<std::string>& varNames, int mod)
-    : root(std::make_unique<Node>()), vars(varNames), modulus(mod) {
-    checkModulus(mod);
+PolynomialTrie::PolynomialTrie()
+    : root(std::make_unique<Node>()),
+      domain(CoefDomain::Zk),
+      modulus(2) {}
+
+PolynomialTrie::PolynomialTrie(const std::vector<std::string>& varNames, CoefDomain d, Coef mod)
+    : root(std::make_unique<Node>()),
+      vars(varNames),
+      domain(d),
+      modulus(mod) {
+    if (domain == CoefDomain::Zk) {
+        checkModulus(modulus);
+    }
 }
 
 std::unique_ptr<PolynomialTrie::Node> PolynomialTrie::cloneNode(const Node* node) const {
@@ -39,6 +47,7 @@ std::unique_ptr<PolynomialTrie::Node> PolynomialTrie::cloneNode(const Node* node
 PolynomialTrie::PolynomialTrie(const PolynomialTrie& other)
     : root(cloneNode(other.root.get())),
       vars(other.vars),
+      domain(other.domain),
       modulus(other.modulus) {}
 
 PolynomialTrie& PolynomialTrie::operator=(const PolynomialTrie& other) {
@@ -46,13 +55,14 @@ PolynomialTrie& PolynomialTrie::operator=(const PolynomialTrie& other) {
         return *this;
     }
 
-    vars = other.vars;
-    modulus = other.modulus;
     root = cloneNode(other.root.get());
+    vars = other.vars;
+    domain = other.domain;
+    modulus = other.modulus;
     return *this;
 }
 
-void PolynomialTrie::checkModulus(int mod) const {
+void PolynomialTrie::checkModulus(Coef mod) const {
     if (mod <= 0) {
         throw std::runtime_error("Modulus must be positive.");
     }
@@ -74,7 +84,10 @@ void PolynomialTrie::checkCompatible(const PolynomialTrie& other) const {
     if (vars != other.vars) {
         throw std::runtime_error("Polynomials use different variables.");
     }
-    if (modulus != other.modulus) {
+    if (domain != other.domain) {
+        throw std::runtime_error("Polynomials use different coefficient domains.");
+    }
+    if (domain == CoefDomain::Zk && modulus != other.modulus) {
         throw std::runtime_error("Polynomials use different modulus.");
     }
 }
@@ -87,7 +100,11 @@ const std::vector<std::string>& PolynomialTrie::variableNames() const {
     return vars;
 }
 
-int PolynomialTrie::getModulus() const {
+CoefDomain PolynomialTrie::getDomain() const {
+    return domain;
+}
+
+Coef PolynomialTrie::getModulus() const {
     return modulus;
 }
 
@@ -96,17 +113,34 @@ void PolynomialTrie::setVariableNames(const std::vector<std::string>& varNames) 
     clear();
 }
 
-void PolynomialTrie::setModulus(int mod) {
-    checkModulus(mod);
+void PolynomialTrie::setDomain(CoefDomain newDomain, Coef mod) {
+    if (newDomain == CoefDomain::Zk) {
+        checkModulus(mod);
+    }
+
+    domain = newDomain;
     modulus = mod;
     normalize();
+}
+
+void PolynomialTrie::setModulus(Coef mod) {
+    checkModulus(mod);
+    modulus = mod;
+
+    if (domain == CoefDomain::Zk) {
+        normalize();
+    }
 }
 
 void PolynomialTrie::clear() {
     root = std::make_unique<Node>();
 }
 
-int PolynomialTrie::normalizeCoef(int value) const {
+Coef PolynomialTrie::normalizeCoef(Coef value) const {
+    if (domain == CoefDomain::Z) {
+        return value;
+    }
+
     value %= modulus;
     if (value < 0) {
         value += modulus;
@@ -114,7 +148,18 @@ int PolynomialTrie::normalizeCoef(int value) const {
     return value;
 }
 
-void PolynomialTrie::addMonomial(int coef, const std::vector<int>& exponents) {
+Coef PolynomialTrie::displayCoef(Coef value) const {
+    value = normalizeCoef(value);
+
+    if (domain == CoefDomain::Z) {
+        return value;
+    }
+
+    Coef alt = value - modulus;
+    return (std::llabs(alt) < std::llabs(value)) ? alt : value;
+}
+
+void PolynomialTrie::addMonomial(Coef coef, const std::vector<int>& exponents) {
     checkExponents(exponents);
 
     coef = normalizeCoef(coef);
@@ -147,7 +192,7 @@ void PolynomialTrie::addMonomial(int coef, const std::vector<int>& exponents) {
     }
 }
 
-void PolynomialTrie::setMonomial(int coef, const std::vector<int>& exponents) {
+void PolynomialTrie::setMonomial(Coef coef, const std::vector<int>& exponents) {
     checkExponents(exponents);
 
     Node* current = root.get();
@@ -242,7 +287,7 @@ PolynomialTrie& PolynomialTrie::operator*=(const PolynomialTrie& other) {
     const std::vector<Term> left = terms();
     const std::vector<Term> right = other.terms();
 
-    PolynomialTrie result(vars, modulus);
+    PolynomialTrie result(vars, domain, modulus);
 
     for (const auto& a : left) {
         for (const auto& b : right) {
@@ -251,7 +296,14 @@ PolynomialTrie& PolynomialTrie::operator*=(const PolynomialTrie& other) {
                 exponents[i] = a.exponents[i] + b.exponents[i];
             }
 
-            int coef = mulMod(normalizeCoef(a.coef), normalizeCoef(b.coef), modulus);
+            Coef coef;
+            if (domain == CoefDomain::Zk) {
+                coef = mulMod(normalizeCoef(a.coef), normalizeCoef(b.coef), modulus);
+                coef = normalizeCoef(coef);
+            } else {
+                coef = a.coef * b.coef;
+            }
+
             result.addMonomial(coef, exponents);
         }
     }
@@ -312,72 +364,94 @@ std::vector<std::vector<int>> PolynomialTrie::support() const {
     return result;
 }
 
-int PolynomialTrie::evaluateHornerRecursive(
-    const std::vector<Term>& termsList,
-    const std::vector<int>& point,
-    int variableIndex
+void PolynomialTrie::collectMaxExponentsDFS(
+    const Node* node,
+    int level,
+    std::vector<int>& maxExp
 ) const {
-    if (termsList.empty()) {
+    if (!node || level == varCount()) {
+        return;
+    }
+
+    for (const auto& [exp, child] : node->children) {
+        if (exp > maxExp[level]) {
+            maxExp[level] = exp;
+        }
+        collectMaxExponentsDFS(child.get(), level + 1, maxExp);
+    }
+}
+
+Coef PolynomialTrie::evaluateDFS(
+    const Node* node,
+    int level,
+    Coef currentValue,
+    const std::vector<std::vector<Coef>>& powers
+) const {
+    if (!node) {
         return 0;
     }
 
-    if (variableIndex == varCount()) {
-        int sum = 0;
-        for (const auto& term : termsList) {
-            sum += normalizeCoef(term.coef);
-            sum %= modulus;
-        }
-        return sum;
-    }
-
-    std::map<int, std::vector<Term>, std::greater<int>> grouped;
-
-    for (const auto& term : termsList) {
-        int exp = term.exponents[variableIndex];
-
-        Term reducedTerm;
-        reducedTerm.coef = term.coef;
-        reducedTerm.exponents = term.exponents;
-        reducedTerm.exponents[variableIndex] = 0;
-
-        grouped[exp].push_back(std::move(reducedTerm));
-    }
-
-    int x = normalizeCoef(point[variableIndex]);
-    int result = 0;
-    bool first = true;
-    int previousDegree = 0;
-
-    for (const auto& [degree, bucket] : grouped) {
-        int coeffValue = evaluateHornerRecursive(bucket, point, variableIndex + 1);
-
-        if (first) {
-            result = coeffValue;
-            previousDegree = degree;
-            first = false;
-            continue;
+    if (level == varCount()) {
+        if (!node->hasCoef) {
+            return 0;
         }
 
-        int gap = previousDegree - degree;
-        result = mulMod(result, fastPowMod(x, gap, modulus), modulus);
-        result = normalizeCoef(result + coeffValue);
-        previousDegree = degree;
+        if (domain == CoefDomain::Zk) {
+            return mulMod(node->coef, currentValue, modulus);
+        }
+        return node->coef * currentValue;
     }
 
-    result = mulMod(result, fastPowMod(x, previousDegree, modulus), modulus);
-    return result;
+    Coef result = 0;
+
+    for (const auto& [exp, child] : node->children) {
+        Coef nextValue;
+        if (domain == CoefDomain::Zk) {
+            nextValue = mulMod(currentValue, powers[level][exp], modulus);
+            result += evaluateDFS(child.get(), level + 1, nextValue, powers);
+            result = normalizeCoef(result);
+        } else {
+            nextValue = currentValue * powers[level][exp];
+            result += evaluateDFS(child.get(), level + 1, nextValue, powers);
+        }
+    }
+
+    return normalizeCoef(result);
 }
 
-int PolynomialTrie::evaluateAt(const std::vector<int>& point) const {
+Coef PolynomialTrie::evaluateAt(const std::vector<Coef>& point) const {
     if (static_cast<int>(point.size()) != varCount()) {
         throw std::runtime_error("Point size does not match variable count.");
     }
 
-    if (isZero() || modulus == 1) {
+    if (isZero()) {
         return 0;
     }
 
-    return evaluateHornerRecursive(terms(), point, 0);
+    if (domain == CoefDomain::Zk && modulus == 1) {
+        return 0;
+    }
+
+    std::vector<int> maxExp(varCount(), 0);
+    collectMaxExponentsDFS(root.get(), 0, maxExp);
+
+    std::vector<std::vector<Coef>> powers(varCount());
+
+    for (int i = 0; i < varCount(); ++i) {
+        Coef base = normalizeCoef(point[i]);
+        powers[i].resize(maxExp[i] + 1);
+        powers[i][0] = (domain == CoefDomain::Zk) ? (1 % modulus) : 1;
+
+        for (int e = 1; e <= maxExp[i]; ++e) {
+            if (domain == CoefDomain::Zk) {
+                powers[i][e] = mulMod(powers[i][e - 1], base, modulus);
+            } else {
+                powers[i][e] = powers[i][e - 1] * base;
+            }
+        }
+    }
+
+    return evaluateDFS(root.get(), 0, (domain == CoefDomain::Zk) ? (1 % modulus) : 1, powers);
 }
 
 int totalDegree(const std::vector<int>& exponents) {
@@ -406,8 +480,8 @@ int PolynomialTrie::homeDegree() const {
 }
 
 std::pair<PolynomialTrie, PolynomialTrie> PolynomialTrie::splitByDegree(int degree) const {
-    PolynomialTrie homogeneousPart(vars, modulus);
-    PolynomialTrie remainder(vars, modulus);
+    PolynomialTrie homogeneousPart(vars, domain, modulus);
+    PolynomialTrie remainder(vars, domain, modulus);
 
     for (const auto& term : terms()) {
         if (totalDegree(term.exponents) == degree) {
@@ -420,8 +494,190 @@ std::pair<PolynomialTrie, PolynomialTrie> PolynomialTrie::splitByDegree(int degr
     return {homogeneousPart, remainder};
 }
 
+bool PolynomialTrie::isGreaterLex(
+    const std::vector<int>& a,
+    const std::vector<int>& b
+) {
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        if (a[i] > b[i]) {
+            return true;
+        }
+        if (a[i] < b[i]) {
+            return false;
+        }
+    }
+    return false;
+}
+
+bool PolynomialTrie::isGreaterInvLex(
+    const std::vector<int>& a,
+    const std::vector<int>& b
+) {
+    for (int i = static_cast<int>(a.size()) - 1; i >= 0; --i) {
+        if (a[i] > b[i]) {
+            return true;
+        }
+        if (a[i] < b[i]) {
+            return false;
+        }
+    }
+    return false;
+}
+
+bool PolynomialTrie::isGreaterRevLex(
+    const std::vector<int>& a,
+    const std::vector<int>& b
+) {
+    for (int i = static_cast<int>(a.size()) - 1; i >= 0; --i) {
+        if (a[i] < b[i]) {
+            return true;
+        }
+        if (a[i] > b[i]) {
+            return false;
+        }
+    }
+    return false;
+}
+
+int PolynomialTrie::compareTotalDegree(
+    const std::vector<int>& a,
+    const std::vector<int>& b
+) {
+    int da = totalDegree(a);
+    int db = totalDegree(b);
+
+    if (da > db) {
+        return 1;
+    }
+    if (da < db) {
+        return -1;
+    }
+    return 0;
+}
+
+bool PolynomialTrie::isGreaterMonomial(
+    const std::vector<int>& a,
+    const std::vector<int>& b,
+    MonomialOrder order
+) {
+    if (a.size() != b.size()) {
+        throw std::runtime_error("Monomials have different dimension.");
+    }
+
+    switch (order) {
+        case MonomialOrder::Lex:
+            return isGreaterLex(a, b);
+
+        case MonomialOrder::GrLex: {
+            int degreeCmp = compareTotalDegree(a, b);
+            if (degreeCmp != 0) {
+                return degreeCmp > 0;
+            }
+            return isGreaterLex(a, b);
+        }
+
+        case MonomialOrder::GrevLex: {
+            int degreeCmp = compareTotalDegree(a, b);
+            if (degreeCmp != 0) {
+                return degreeCmp > 0;
+            }
+            return isGreaterRevLex(a, b);
+        }
+
+        case MonomialOrder::InvLex:
+            return isGreaterInvLex(a, b);
+
+        case MonomialOrder::RevLex:
+            return isGreaterRevLex(a, b);
+    }
+
+    return false;
+}
+
+LeadingData PolynomialTrie::leadingData(MonomialOrder order) const {
+    const std::vector<Term> ts = terms();
+
+    LeadingData result;
+    if (ts.empty()) {
+        return result;
+    }
+
+    result.coef = ts[0].coef;
+    result.exponents = ts[0].exponents;
+    result.exists = true;
+
+    for (std::size_t i = 1; i < ts.size(); ++i) {
+        if (isGreaterMonomial(ts[i].exponents, result.exponents, order)) {
+            result.coef = ts[i].coef;
+            result.exponents = ts[i].exponents;
+        }
+    }
+
+    result.coef = normalizeCoef(result.coef);
+    return result;
+}
+
+std::vector<int> PolynomialTrie::leadingMonomial(MonomialOrder order) const {
+    LeadingData d = leadingData(order);
+    if (!d.exists) {
+        throw std::runtime_error("Zero polynomial has no leading monomial.");
+    }
+    return d.exponents;
+}
+
+Coef PolynomialTrie::leadingCoefficient(MonomialOrder order) const {
+    LeadingData d = leadingData(order);
+    if (!d.exists) {
+        throw std::runtime_error("Zero polynomial has no leading coefficient.");
+    }
+    return d.coef;
+}
+
+Term PolynomialTrie::leadingTerm(MonomialOrder order) const {
+    LeadingData d = leadingData(order);
+    if (!d.exists) {
+        throw std::runtime_error("Zero polynomial has no leading term.");
+    }
+    return Term{d.coef, d.exponents};
+}
+
+std::vector<int> PolynomialTrie::multiDegree(MonomialOrder order) const {
+    return leadingMonomial(order);
+}
+
+std::string PolynomialTrie::monomialOnlyToString(const std::vector<int>& exponents) const {
+    checkExponents(exponents);
+
+    bool hasVariables = false;
+    for (int exp : exponents) {
+        if (exp != 0) {
+            hasVariables = true;
+            break;
+        }
+    }
+
+    if (!hasVariables) {
+        return "1";
+    }
+
+    std::ostringstream out;
+    for (int i = 0; i < varCount(); ++i) {
+        int exp = exponents[i];
+        if (exp == 0) {
+            continue;
+        }
+
+        out << vars[i];
+        if (exp != 1) {
+            out << "^" << exp;
+        }
+    }
+
+    return out.str();
+}
+
 std::string PolynomialTrie::monomialToString(const Term& t) const {
-    int coef = normalizeCoef(t.coef);
+    Coef coef = displayCoef(t.coef);
 
     bool hasVariablePart = false;
     for (int exp : t.exponents) {
@@ -437,7 +693,9 @@ std::string PolynomialTrie::monomialToString(const Term& t) const {
 
     std::ostringstream out;
 
-    if (coef != 1) {
+    if (coef == -1) {
+        out << "-";
+    } else if (coef != 1) {
         out << coef;
     }
 
@@ -476,27 +734,85 @@ std::string PolynomialTrie::toString() const {
     bool first = true;
 
     for (const auto& term : ts) {
-        int coef = normalizeCoef(term.coef);
-        if (coef == 0) {
+        if (normalizeCoef(term.coef) == 0) {
             continue;
         }
 
-        if (!first) {
-            out << " + ";
-        }
+        Coef shown = displayCoef(term.coef);
+        std::string piece = monomialToString(term);
 
-        out << monomialToString(term);
-        first = false;
+        if (first) {
+            out << piece;
+            first = false;
+        } else if (shown < 0) {
+            if (!piece.empty() && piece[0] == '-') {
+                out << " - " << piece.substr(1);
+            } else {
+                out << " - " << piece;
+            }
+        } else {
+            out << " + " << piece;
+        }
     }
 
-    if (first) {
+    return first ? "0" : out.str();
+}
+
+std::string PolynomialTrie::toString(MonomialOrder order) const {
+    std::vector<Term> ts = terms();
+    if (ts.empty()) {
         return "0";
     }
 
-    return out.str();
+    std::sort(ts.begin(), ts.end(), [order](const Term& a, const Term& b) {
+        return PolynomialTrie::isGreaterMonomial(a.exponents, b.exponents, order);
+    });
+
+    std::ostringstream out;
+    bool first = true;
+
+    for (const auto& term : ts) {
+        if (normalizeCoef(term.coef) == 0) {
+            continue;
+        }
+
+        Coef shown = displayCoef(term.coef);
+        std::string piece = monomialToString(term);
+
+        if (first) {
+            out << piece;
+            first = false;
+        } else if (shown < 0) {
+            if (!piece.empty() && piece[0] == '-') {
+                out << " - " << piece.substr(1);
+            } else {
+                out << " - " << piece;
+            }
+        } else {
+            out << " + " << piece;
+        }
+    }
+
+    return first ? "0" : out.str();
 }
 
-int fastPowMod(int a, int e, int mod) {
+Coef fastPow(Coef a, int e) {
+    if (e < 0) {
+        throw std::runtime_error("Exponent must be non-negative.");
+    }
+
+    Coef result = 1;
+    while (e > 0) {
+        if (e & 1) {
+            result *= a;
+        }
+        a *= a;
+        e >>= 1;
+    }
+    return result;
+}
+
+Coef fastPowMod(Coef a, int e, Coef mod) {
     if (mod <= 0) {
         throw std::runtime_error("Modulus must be positive.");
     }
@@ -509,7 +825,7 @@ int fastPowMod(int a, int e, int mod) {
         a += mod;
     }
 
-    int result = 1 % mod;
+    Coef result = 1 % mod;
 
     while (e > 0) {
         if (e & 1) {
