@@ -1,146 +1,99 @@
 #pragma once
 
-#include <map>
-#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 using Coef = long long;
+using std::vector;
+using std::string;
 
 struct Term {
     Coef coef = 0;
-    std::vector<int> exponents;
-};
-
-enum class CoefDomain {
-    Z,
-    Zk
+    vector<int> exponents;
 };
 
 enum class MonomialOrder {
     Lex,
     GrLex,
-    GrevLex,
-    InvLex,
-    RevLex
+    GrevLex
 };
 
 struct LeadingData {
     Coef coef = 0;
-    std::vector<int> exponents;
+    vector<int> exponents;
     bool exists = false;
 };
 
-class PolynomialTrie {
+class Polynomial {
 private:
-    struct Node {
-        std::map<int, std::unique_ptr<Node>> children;
-        Coef coef = 0;
-        bool hasCoef = false;
-    };
+    vector<string> vars;
+    vector<Term> data;
 
-    std::unique_ptr<Node> root;
-    std::vector<std::string> vars;
-    CoefDomain domain = CoefDomain::Zk;
-    Coef modulus = 2;
+    void checkExponents(const vector<int>& exponents) const;
+    void combineLikeTerms();
 
-private:
-    std::unique_ptr<Node> cloneNode(const Node* node) const;
-
-    void checkModulus(Coef mod) const;
-    void checkExponents(const std::vector<int>& exponents) const;
-    void checkCompatible(const PolynomialTrie& other) const;
-
-    void collectTermsDFS(
-        const Node* node,
-        int level,
-        std::vector<int>& path,
-        std::vector<Term>& result
-    ) const;
-
-    void collectMaxExponentsDFS(
-        const Node* node,
-        int level,
-        std::vector<int>& maxExp
-    ) const;
-
-    Coef evaluateDFS(
-        const Node* node,
-        int level,
-        Coef currentValue,
-        const std::vector<std::vector<Coef>>& powers
-    ) const;
-
-    static bool isGreaterLex(const std::vector<int>& a, const std::vector<int>& b);
-    static bool isGreaterInvLex(const std::vector<int>& a, const std::vector<int>& b);
-    static bool isGreaterRevLex(const std::vector<int>& a, const std::vector<int>& b);
-    static int compareTotalDegree(const std::vector<int>& a, const std::vector<int>& b);
+    static bool sameMonomial(const vector<int>& a, const vector<int>& b);
+    static bool isGreaterLex(const vector<int>& a, const vector<int>& b);
+    static bool isGreaterGrevLexTie(const vector<int>& a, const vector<int>& b);
+    static int compareTotalDegree(const vector<int>& a, const vector<int>& b);
+    
+    vector<int> lcmMonomial(const vector<int>& a, const vector<int>& b) const;
+    vector<int> subtractMonomial(const vector<int>& a, const vector<int>& b) const;
+    bool dividesMonomial(const vector<int>& a, const vector<int>& b) const;
+    Coef exactDivide(Coef a, Coef b) const;
 
 public:
-    PolynomialTrie();
-    PolynomialTrie(const std::vector<std::string>& varNames, CoefDomain domain, Coef mod = 2);
-
-    PolynomialTrie(const PolynomialTrie& other);
-    PolynomialTrie& operator=(const PolynomialTrie& other);
-
-    PolynomialTrie(PolynomialTrie&& other) noexcept = default;
-    PolynomialTrie& operator=(PolynomialTrie&& other) noexcept = default;
+    Polynomial() = default;
+    explicit Polynomial(const vector<string>& varNames);
 
     int varCount() const;
-    const std::vector<std::string>& variableNames() const;
-    CoefDomain getDomain() const;
-    Coef getModulus() const;
+    const vector<string>& variableNames() const;
 
-    void setVariableNames(const std::vector<std::string>& varNames);
-    void setDomain(CoefDomain newDomain, Coef mod = 2);
-    void setModulus(Coef mod);
+    void setVariableNames(const vector<string>& varNames);
     void clear();
 
-    Coef normalizeCoef(Coef value) const;
-    Coef displayCoef(Coef value) const;
+    void addMonomial(Coef coef, const vector<int>& exponents);
+    void setMonomial(Coef coef, const vector<int>& exponents);
 
-    void addMonomial(Coef coef, const std::vector<int>& exponents);
-    void setMonomial(Coef coef, const std::vector<int>& exponents);
-
-    std::vector<Term> terms() const;
-    void normalize();
+    const vector<Term>& terms() const;
     bool isZero() const;
 
-    PolynomialTrie& operator+=(const PolynomialTrie& other);
-    PolynomialTrie& operator-=(const PolynomialTrie& other);
-    PolynomialTrie& operator*=(const PolynomialTrie& other);
+    Polynomial& operator+=(const Polynomial& other);
+    Polynomial& operator-=(const Polynomial& other);
+    Polynomial& operator*=(const Polynomial& other);
 
-    PolynomialTrie operator+(const PolynomialTrie& other) const;
-    PolynomialTrie operator-(const PolynomialTrie& other) const;
-    PolynomialTrie operator*(const PolynomialTrie& other) const;
+    Polynomial operator+(const Polynomial& other) const;
+    Polynomial operator-(const Polynomial& other) const;
+    Polynomial operator*(const Polynomial& other) const;
 
-    bool operator==(const PolynomialTrie& other) const;
-    bool operator!=(const PolynomialTrie& other) const;
+    bool operator==(const Polynomial& other) const;
+    bool operator!=(const Polynomial& other) const;
 
-    std::vector<std::vector<int>> support() const;
-    Coef evaluateAt(const std::vector<Coef>& point) const;
+    vector<vector<int>> support() const;
+    Coef evaluateAt(const vector<Coef>& point) const;
     int homeDegree() const;
-    std::pair<PolynomialTrie, PolynomialTrie> splitByDegree(int degree) const;
+    std::pair<Polynomial, Polynomial> splitByDegree(int degree) const;
 
     LeadingData leadingData(MonomialOrder order) const;
-    std::vector<int> leadingMonomial(MonomialOrder order) const;
+    vector<int> leadingMonomial(MonomialOrder order) const;
     Coef leadingCoefficient(MonomialOrder order) const;
     Term leadingTerm(MonomialOrder order) const;
-    std::vector<int> multiDegree(MonomialOrder order) const;
+    vector<int> multiDegree(MonomialOrder order) const;
 
-    std::string monomialToString(const Term& t) const;
-    std::string monomialOnlyToString(const std::vector<int>& exponents) const;
-    std::string toString() const;
-    std::string toString(MonomialOrder order) const;
+    string monomialOnlyToString(const vector<int>& exponents) const;
+    string monomialToString(const Term& t) const;
+    string toString() const;
+    string toString(MonomialOrder order) const;
 
-    static bool isGreaterMonomial(
-        const std::vector<int>& a,
-        const std::vector<int>& b,
-        MonomialOrder order
-    );
+    static bool isGreaterMonomial(const vector<int>& a, const vector<int>& b, MonomialOrder order );
+
+    vector<int> multiDegreePair(const Polynomial& other, MonomialOrder order) const;
+    Polynomial multiplyByMonomial(Coef coef, const vector<int>& exponents) const;
+    Polynomial sPolynomial(const Polynomial& other, MonomialOrder order) const;
+    Polynomial remainderOnDivision(const vector<Polynomial>& basis, MonomialOrder order) const;
+    static bool isGroebnerBasis(const vector<Polynomial>& basis, MonomialOrder order);
 };
 
 Coef fastPow(Coef a, int e);
-Coef fastPowMod(Coef a, int e, Coef mod);
-int totalDegree(const std::vector<int>& exponents);
+int totalDegree(const vector<int>& exponents);

@@ -10,23 +10,23 @@ struct JsonCommand {
     std::string op;
     std::vector<Coef> point;
     int degree = 0;
-    std::string order;
 };
 
 struct JsonInputData {
-    CoefDomain domain = CoefDomain::Zk;
-    Coef modulus = 2;
     std::vector<std::string> variables;
-    PolynomialTrie f;
-    PolynomialTrie g;
+    MonomialOrder order = MonomialOrder::Lex;
+    Polynomial f;
+    Polynomial g;
+    std::vector<Polynomial> basis;
     std::vector<JsonCommand> commands;
 };
 
 JsonInputData readJsonInput(const std::string& filename);
 
-CoefDomain parseDomain(const std::string& s);
 MonomialOrder parseOrder(const std::string& s);
+std::string orderToString(MonomialOrder order);
 
 void executeCommands(const JsonInputData& data, std::ostream& out);
-void printSupport(const PolynomialTrie& f, std::ostream& out);
+
+void printSupport(const Polynomial& f, std::ostream& out);
 void printMultiDegree(const std::vector<int>& exponents, std::ostream& out);
