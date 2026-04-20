@@ -6,27 +6,53 @@
 #include <string>
 #include <vector>
 
+using std::ostream;
+using std::string;
+using std::vector;
+
+enum class RingViewMode {
+    AllVariables,
+    ZAsCoefficient
+};
+
 struct JsonCommand {
-    std::string op;
-    std::vector<Coef> point;
+    string op;
+    vector<long long> point;
     int degree = 0;
 };
 
-struct JsonInputData {
-    std::vector<std::string> variables;
+template <class Poly>
+struct JsonInputDataT {
+    string domain;
+
+    vector<string> variables;
     MonomialOrder order = MonomialOrder::Lex;
-    Polynomial f;
-    Polynomial g;
-    std::vector<Polynomial> basis;
-    std::vector<JsonCommand> commands;
+
+    RingViewMode ringViewMode = RingViewMode::AllVariables;
+    string zVariableName = "z";
+
+    Poly f;
+    Poly g;
+    vector<Poly> basis;
+    vector<JsonCommand> commands;
 };
 
-JsonInputData readJsonInput(const std::string& filename);
+RingViewMode parseRingViewMode(const string& s);
+string ringViewModeToString(RingViewMode mode);
 
-MonomialOrder parseOrder(const std::string& s);
-std::string orderToString(MonomialOrder order);
+MonomialOrder parseOrder(const string& s);
+string orderToString(MonomialOrder order);
 
-void executeCommands(const JsonInputData& data, std::ostream& out);
+template <class Poly>
+JsonInputDataT<Poly> readJsonInputT(const string& filename);
 
-void printSupport(const Polynomial& f, std::ostream& out);
-void printMultiDegree(const std::vector<int>& exponents, std::ostream& out);
+template <class Poly>
+MonomialView buildMonomialView(const JsonInputDataT<Poly>& data);
+
+template <class Poly>
+void printSupport(const Poly& f, ostream& out);
+
+void printMultiDegree(const vector<int>& exponents, ostream& out);
+
+template <class Poly>
+void executeCommands(const JsonInputDataT<Poly>& data, ostream& out);

@@ -10,7 +10,7 @@ find_package(nlohmann_json CONFIG REQUIRED)
 
 add_executable(polynom_app
         main.cpp
-        Polynomial.cpp
+        Polynomial.tpp
         PolynomialIO.cpp
 )
 
